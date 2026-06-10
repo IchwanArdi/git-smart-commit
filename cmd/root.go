@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/IchwanArdi/git-smart-commit/internal/git"
 	"github.com/IchwanArdi/git-smart-commit/internal/prompt"
@@ -36,20 +37,23 @@ konsisten, dan mengikuti standar Conventional Commits secara interaktif.`,
 			guessedScope = git.GuessScope(stagedFiles)
 		}
 
-		// 4. Tampilkan TUI Form (Huh)
-		answers, err := prompt.AskQuestions(guessedScope)
+		// 4. Periksa apakah repositori memiliki remote
+		hasRemote := git.HasRemote()
+
+		// 5. Tampilkan TUI Form (Huh)
+		answers, err := prompt.AskQuestions(guessedScope, hasRemote)
 		if err != nil {
 			fmt.Printf("❌ Batal: %v\n", err)
 			os.Exit(1)
 		}
 
-		// 5. Cek konfirmasi commit dari user
+		// 6. Cek konfirmasi commit dari user
 		if !answers.ConfirmCommit {
 			fmt.Println("🚫 Commit dibatalkan.")
 			os.Exit(0)
 		}
 
-		// 6. Format dan eksekusi commit
+		// 7. Format dan eksekusi commit
 		commitMsg := answers.FormatCommitMessage()
 		output, err := git.ExecuteCommit(commitMsg)
 		if err != nil {
@@ -59,6 +63,36 @@ konsisten, dan mengikuti standar Conventional Commits secara interaktif.`,
 
 		fmt.Println("\n✅ Berhasil membuat commit!")
 		fmt.Println(output)
+
+		// 8. Eksekusi push jika dikonfirmasi oleh user
+		if answers.ConfirmPush {
+			fmt.Println("🚀 Sedang melakukan push ke remote repository...")
+
+			// Ambil nama branch saat ini
+			branch, err := git.GetCurrentBranch()
+			if err != nil {
+				fmt.Printf("❌ Gagal mendapatkan nama branch saat ini: %v\n", err)
+				os.Exit(1)
+			}
+
+			// Ambil daftar remote, default ke origin jika tidak terdeteksi
+			remotes, err := git.GetRemotes()
+			remote := "origin"
+			if err == nil && len(remotes) > 0 {
+				remote = remotes[0]
+			}
+
+			pushOutput, err := git.ExecutePush(remote, branch)
+			if err != nil {
+				fmt.Printf("❌ Gagal melakukan push ke %s/%s:\n%s\n", remote, branch, err)
+				os.Exit(1)
+			}
+
+			fmt.Printf("✅ Berhasil push ke %s/%s!\n", remote, branch)
+			if strings.TrimSpace(pushOutput) != "" {
+				fmt.Println(pushOutput)
+			}
+		}
 	},
 }
 

@@ -84,3 +84,58 @@ func ExecuteCommit(message string) (string, error) {
 
 	return stdout.String(), nil
 }
+
+// GetRemotes mengambil daftar remote yang dikonfigurasi.
+func GetRemotes() ([]string, error) {
+	cmd := exec.Command("git", "remote")
+	var stdout bytes.Buffer
+	cmd.Stdout = &stdout
+	err := cmd.Run()
+	if err != nil {
+		return nil, err
+	}
+
+	lines := strings.Split(strings.TrimSpace(stdout.String()), "\n")
+	var remotes []string
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed != "" {
+			remotes = append(remotes, trimmed)
+		}
+	}
+	return remotes, nil
+}
+
+// HasRemote memeriksa apakah repositori memiliki remote yang dikonfigurasi.
+func HasRemote() bool {
+	remotes, err := GetRemotes()
+	return err == nil && len(remotes) > 0
+}
+
+// GetCurrentBranch mengambil nama branch saat ini.
+func GetCurrentBranch() (string, error) {
+	cmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
+	var stdout bytes.Buffer
+	cmd.Stdout = &stdout
+	err := cmd.Run()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(stdout.String()), nil
+}
+
+// ExecutePush menjalankan "git push <remote> <branch>".
+func ExecutePush(remote, branch string) (string, error) {
+	cmd := exec.Command("git", "push", remote, branch)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
+	if err != nil {
+		return stderr.String() + stdout.String(), fmt.Errorf("gagal melakukan push: %w", err)
+	}
+
+	return stdout.String() + stderr.String(), nil
+}
+

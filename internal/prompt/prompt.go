@@ -14,70 +14,80 @@ type CommitAnswers struct {
 	Subject       string
 	Body          string
 	ConfirmCommit bool
+	ConfirmPush   bool
 }
 
 // AskQuestions memicu formulir interaktif satu halaman (TUI Form) menggunakan Huh.
-func AskQuestions(defaultScope string) (*CommitAnswers, error) {
+func AskQuestions(defaultScope string, showPush bool) (*CommitAnswers, error) {
 	var answers CommitAnswers
 	answers.Scope = defaultScope // Mengisi scope secara otomatis berdasarkan tebakan git
 	answers.ConfirmCommit = true // Mengisi default value konfirmasi
+	answers.ConfirmPush = false  // Mengisi default value push
+
+	fields := []huh.Field{
+		// 1. Pemilihan Tipe Commit
+		huh.NewSelect[string]().
+			Title("Tipe Commit").
+			Description("Pilih kategori perubahan kode Anda:").
+			Options(
+				huh.NewOption("feat (Fitur Baru)", "feat"),
+				huh.NewOption("fix (Perbaikan Bug)", "fix"),
+				huh.NewOption("docs (Dokumentasi)", "docs"),
+				huh.NewOption("style (Format/Gaya Kode)", "style"),
+				huh.NewOption("refactor (Restrukturisasi)", "refactor"),
+				huh.NewOption("perf (Performa)", "perf"),
+				huh.NewOption("test (Unit Test)", "test"),
+				huh.NewOption("build (Build System/Deps)", "build"),
+				huh.NewOption("ci (CI/CD Config)", "ci"),
+				huh.NewOption("chore (Tugas Lain)", "chore"),
+			).
+			Value(&answers.Type),
+
+		// 2. Scope Input
+		huh.NewInput().
+			Title("Scope Commit").
+			Description("Modul/bagian kode yang diubah (misal: auth, db):").
+			Value(&answers.Scope).
+			Placeholder("opsional"),
+
+		// 3. Subject Input (Wajib dengan Validasi Panjang)
+		huh.NewInput().
+			Title("Deskripsi Singkat (Subject)").
+			Description("Ringkasan singkat apa yang diubah (wajib):").
+			Value(&answers.Subject).
+			Placeholder("Tulis deskripsi commit...").
+			Validate(func(str string) error {
+				trimmed := strings.TrimSpace(str)
+				if len(trimmed) == 0 {
+					return fmt.Errorf("deskripsi wajib diisi!")
+				}
+				if len(trimmed) > 72 {
+					return fmt.Errorf("deskripsi terlalu panjang (maksimal 72 karakter)!")
+				}
+				return nil
+			}),
+
+		// 4. Body Input
+		huh.NewInput().
+			Title("Deskripsi Detail (Body)").
+			Description("Penjelasan lebih mendalam tentang perubahan (opsional):").
+			Value(&answers.Body).
+			Placeholder("opsional"),
+
+		// 5. Konfirmasi Commit Langsung
+		huh.NewConfirm().
+			Title("Apakah Anda ingin membuat commit dengan pesan ini?").
+			Value(&answers.ConfirmCommit),
+	}
+
+	if showPush {
+		fields = append(fields, huh.NewConfirm().
+			Title("Apakah Anda ingin langsung melakukan push ke remote repository setelah commit?").
+			Value(&answers.ConfirmPush))
+	}
 
 	form := huh.NewForm(
-		huh.NewGroup(
-			// 1. Pemilihan Tipe Commit
-			huh.NewSelect[string]().
-				Title("Tipe Commit").
-				Description("Pilih kategori perubahan kode Anda:").
-				Options(
-					huh.NewOption("feat (Fitur Baru)", "feat"),
-					huh.NewOption("fix (Perbaikan Bug)", "fix"),
-					huh.NewOption("docs (Dokumentasi)", "docs"),
-					huh.NewOption("style (Format/Gaya Kode)", "style"),
-					huh.NewOption("refactor (Restrukturisasi)", "refactor"),
-					huh.NewOption("perf (Performa)", "perf"),
-					huh.NewOption("test (Unit Test)", "test"),
-					huh.NewOption("build (Build System/Deps)", "build"),
-					huh.NewOption("ci (CI/CD Config)", "ci"),
-					huh.NewOption("chore (Tugas Lain)", "chore"),
-				).
-				Value(&answers.Type),
-
-			// 2. Scope Input
-			huh.NewInput().
-				Title("Scope Commit").
-				Description("Modul/bagian kode yang diubah (misal: auth, db):").
-				Value(&answers.Scope).
-				Placeholder("opsional"),
-
-			// 3. Subject Input (Wajib dengan Validasi Panjang)
-			huh.NewInput().
-				Title("Deskripsi Singkat (Subject)").
-				Description("Ringkasan singkat apa yang diubah (wajib):").
-				Value(&answers.Subject).
-				Placeholder("Tulis deskripsi commit...").
-				Validate(func(str string) error {
-					trimmed := strings.TrimSpace(str)
-					if len(trimmed) == 0 {
-						return fmt.Errorf("deskripsi wajib diisi!")
-					}
-					if len(trimmed) > 72 {
-						return fmt.Errorf("deskripsi terlalu panjang (maksimal 72 karakter)!")
-					}
-					return nil
-				}),
-
-			// 4. Body Input
-			huh.NewInput().
-				Title("Deskripsi Detail (Body)").
-				Description("Penjelasan lebih mendalam tentang perubahan (opsional):").
-				Value(&answers.Body).
-				Placeholder("opsional"),
-
-			// 5. Konfirmasi Commit Langsung
-			huh.NewConfirm().
-				Title("Apakah Anda ingin membuat commit dengan pesan ini?").
-				Value(&answers.ConfirmCommit),
-		),
+		huh.NewGroup(fields...),
 	)
 
 	// Menjalankan form
