@@ -37,11 +37,16 @@ konsisten, dan mengikuti standar Conventional Commits secara interaktif.`,
 			guessedScope = git.GuessScope(stagedFiles)
 		}
 
-		// 4. Periksa apakah repositori memiliki remote
-		hasRemote := git.HasRemote()
+		// 4. Periksa apakah repositori memiliki remote dan dapatkan nama branch saat ini
+		branchName := ""
+		if git.HasRemote() {
+			if b, err := git.GetCurrentBranch(); err == nil {
+				branchName = b
+			}
+		}
 
 		// 5. Tampilkan TUI Form (Huh)
-		answers, err := prompt.AskQuestions(guessedScope, hasRemote)
+		answers, err := prompt.AskQuestions(guessedScope, branchName)
 		if err != nil {
 			fmt.Printf("❌ Batal: %v\n", err)
 			os.Exit(1)
@@ -68,11 +73,14 @@ konsisten, dan mengikuti standar Conventional Commits secara interaktif.`,
 		if answers.ConfirmPush {
 			fmt.Println("🚀 Sedang melakukan push ke remote repository...")
 
-			// Ambil nama branch saat ini
-			branch, err := git.GetCurrentBranch()
-			if err != nil {
-				fmt.Printf("❌ Gagal mendapatkan nama branch saat ini: %v\n", err)
-				os.Exit(1)
+			// Pastikan branchName tidak kosong, jika kosong ambil ulang
+			if branchName == "" {
+				var err error
+				branchName, err = git.GetCurrentBranch()
+				if err != nil {
+					fmt.Printf("❌ Gagal mendapatkan nama branch saat ini: %v\n", err)
+					os.Exit(1)
+				}
 			}
 
 			// Ambil daftar remote, default ke origin jika tidak terdeteksi
@@ -82,13 +90,13 @@ konsisten, dan mengikuti standar Conventional Commits secara interaktif.`,
 				remote = remotes[0]
 			}
 
-			pushOutput, err := git.ExecutePush(remote, branch)
+			pushOutput, err := git.ExecutePush(remote, branchName)
 			if err != nil {
-				fmt.Printf("❌ Gagal melakukan push ke %s/%s:\n%s\n", remote, branch, err)
+				fmt.Printf("❌ Gagal melakukan push ke %s/%s:\n%s\n", remote, branchName, err)
 				os.Exit(1)
 			}
 
-			fmt.Printf("✅ Berhasil push ke %s/%s!\n", remote, branch)
+			fmt.Printf("✅ Berhasil push ke %s/%s!\n", remote, branchName)
 			if strings.TrimSpace(pushOutput) != "" {
 				fmt.Println(pushOutput)
 			}

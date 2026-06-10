@@ -18,7 +18,7 @@ type CommitAnswers struct {
 }
 
 // AskQuestions memicu formulir interaktif satu halaman (TUI Form) menggunakan Huh.
-func AskQuestions(defaultScope string, showPush bool) (*CommitAnswers, error) {
+func AskQuestions(defaultScope string, branchName string) (*CommitAnswers, error) {
 	var answers CommitAnswers
 	answers.Scope = defaultScope // Mengisi scope secara otomatis berdasarkan tebakan git
 	answers.ConfirmCommit = true // Mengisi default value konfirmasi
@@ -80,9 +80,9 @@ func AskQuestions(defaultScope string, showPush bool) (*CommitAnswers, error) {
 			Value(&answers.ConfirmCommit),
 	}
 
-	if showPush {
+	if branchName != "" {
 		fields = append(fields, huh.NewConfirm().
-			Title("Apakah Anda ingin langsung melakukan push ke remote repository setelah commit?").
+			Title(fmt.Sprintf("Apakah Anda ingin langsung melakukan push ke remote repository dengan branch '%s'?", branchName)).
 			Value(&answers.ConfirmPush))
 	}
 
