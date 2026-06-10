@@ -1,4 +1,4 @@
-module git-smart-commit
+module github.com/IchwanArdi/git-smart-commit
 
 go 1.26.3
 

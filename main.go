@@ -1,6 +1,6 @@
 package main
 
-import "git-smart-commit/cmd"
+import "github.com/IchwanArdi/git-smart-commit/cmd"
 
 func main() {
 	cmd.Execute()

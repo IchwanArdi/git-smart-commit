@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"git-smart-commit/internal/git"
-	"git-smart-commit/internal/prompt"
+	"github.com/IchwanArdi/git-smart-commit/internal/git"
+	"github.com/IchwanArdi/git-smart-commit/internal/prompt"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/spf13/cobra"
