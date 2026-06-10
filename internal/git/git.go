@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"os/exec"
+	"strings"
 )
 
 // IsGitRepo memeriksa apakah direktori aktif saat ini merupakan repositori Git.
@@ -16,12 +17,9 @@ func IsGitRepo() bool {
 // HasStagedChanges memeriksa apakah ada file yang sudah di-stage (dijalankan git add)
 // dan siap untuk di-commit.
 func HasStagedChanges() bool {
-	// "git diff --cached --quiet" mengembalikan exit code 1 jika ada file yang di-stage,
-	// dan exit code 0 jika tidak ada file yang di-stage.
 	cmd := exec.Command("git", "diff", "--cached", "--quiet")
 	err := cmd.Run()
 	if err != nil {
-		// Jika error tipe ExitError, kita cek exit code-nya.
 		if exitError, ok := err.(*exec.ExitError); ok {
 			return exitError.ExitCode() == 1
 		}
@@ -29,7 +27,50 @@ func HasStagedChanges() bool {
 	return false
 }
 
-// ExecuteCommit menjalankan "git commit -m '<pesan>'" menggunakan os/exec.
+// GetStagedFiles mengambil daftar path file yang sedang di-stage saat ini.
+func GetStagedFiles() ([]string, error) {
+	cmd := exec.Command("git", "diff", "--cached", "--name-only")
+	var stdout bytes.Buffer
+	cmd.Stdout = &stdout
+	err := cmd.Run()
+	if err != nil {
+		return nil, err
+	}
+
+	lines := strings.Split(strings.TrimSpace(stdout.String()), "\n")
+	var files []string
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed != "" {
+			files = append(files, trimmed)
+		}
+	}
+	return files, nil
+}
+
+// GuessScope menebak scope terbaik berdasarkan nama direktori file yang baru saja di-stage.
+func GuessScope(files []string) string {
+	if len(files) == 0 {
+		return ""
+	}
+
+	// Ambil file pertama sebagai referensi
+	firstFile := files[0]
+
+	// Pisahkan path file berdasarkan slash "/" (atau backslash "\" di Windows jika diformat git)
+	// Git path selalu menggunakan "/" forward slash
+	parts := strings.Split(firstFile, "/")
+	if len(parts) > 1 {
+		// Mengambil nama folder terdekat sebelum nama file
+		// Contoh: internal/git/git.go -> git
+		return parts[len(parts)-2]
+	}
+
+	// Jika file berada di root (misal main.go), kita kosongkan default scope-nya
+	return ""
+}
+
+// ExecuteCommit menjalankan "git commit -m '<pesan>'".
 func ExecuteCommit(message string) (string, error) {
 	cmd := exec.Command("git", "commit", "-m", message)
 	var stdout, stderr bytes.Buffer

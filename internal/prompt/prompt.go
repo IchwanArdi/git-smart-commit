@@ -1,97 +1,89 @@
 package prompt
 
 import (
+	"fmt"
 	"strings"
 
-	"github.com/AlecAivazis/survey/v2"
+	"github.com/charmbracelet/huh"
 )
 
 // CommitAnswers menyimpan jawaban dari user untuk setiap bagian Conventional Commits.
 type CommitAnswers struct {
-	Type      string
-	Scope     string
-	Subject   string
-	Body      string
-	HasFooter bool
-	Footer    string
+	Type          string
+	Scope         string
+	Subject       string
+	Body          string
+	ConfirmCommit bool
 }
 
-// AskQuestions memicu rangkaian form interaktif di terminal.
-func AskQuestions() (*CommitAnswers, error) {
+// AskQuestions memicu formulir interaktif satu halaman (TUI Form) menggunakan Huh.
+func AskQuestions(defaultScope string) (*CommitAnswers, error) {
 	var answers CommitAnswers
+	answers.Scope = defaultScope // Mengisi scope secara otomatis berdasarkan tebakan git
+	answers.ConfirmCommit = true // Mengisi default value konfirmasi
 
-	// 1. Tipe Commit (pilihan ganda)
-	typePrompt := &survey.Select{
-		Message: "Pilih tipe commit:",
-		Options: []string{
-			"feat:     Fitur baru",
-			"fix:      Perbaikan bug",
-			"docs:     Perubahan dokumentasi",
-			"style:    Perbaikan format kode (semicolon, spasi, dll)",
-			"refactor: Restrukturisasi kode (bukan bugfix atau fitur)",
-			"perf:     Peningkatan performa",
-			"test:     Menambah atau memperbaiki unit test",
-			"build:    Perubahan build system atau dependency (go.mod, webpack, dll)",
-			"ci:       Perubahan konfigurasi CI/CD (GitHub Actions, dll)",
-			"chore:    Tugas rutin lain (tanpa menyentuh source code utama)",
-			"revert:   Membatalkan commit sebelumnya",
-		},
-		Default: "feat:     Fitur baru",
-	}
+	form := huh.NewForm(
+		huh.NewGroup(
+			// 1. Pemilihan Tipe Commit
+			huh.NewSelect[string]().
+				Title("Tipe Commit").
+				Description("Pilih kategori perubahan kode Anda:").
+				Options(
+					huh.NewOption("feat (Fitur Baru)", "feat"),
+					huh.NewOption("fix (Perbaikan Bug)", "fix"),
+					huh.NewOption("docs (Dokumentasi)", "docs"),
+					huh.NewOption("style (Format/Gaya Kode)", "style"),
+					huh.NewOption("refactor (Restrukturisasi)", "refactor"),
+					huh.NewOption("perf (Performa)", "perf"),
+					huh.NewOption("test (Unit Test)", "test"),
+					huh.NewOption("build (Build System/Deps)", "build"),
+					huh.NewOption("ci (CI/CD Config)", "ci"),
+					huh.NewOption("chore (Tugas Lain)", "chore"),
+				).
+				Value(&answers.Type),
 
-	var selectedType string
-	if err := survey.AskOne(typePrompt, &selectedType); err != nil {
+			// 2. Scope Input
+			huh.NewInput().
+				Title("Scope Commit").
+				Description("Modul/bagian kode yang diubah (misal: auth, db):").
+				Value(&answers.Scope).
+				Placeholder("opsional"),
+
+			// 3. Subject Input (Wajib dengan Validasi Panjang)
+			huh.NewInput().
+				Title("Deskripsi Singkat (Subject)").
+				Description("Ringkasan singkat apa yang diubah (wajib):").
+				Value(&answers.Subject).
+				Placeholder("Tulis deskripsi commit...").
+				Validate(func(str string) error {
+					trimmed := strings.TrimSpace(str)
+					if len(trimmed) == 0 {
+						return fmt.Errorf("deskripsi wajib diisi!")
+					}
+					if len(trimmed) > 72 {
+						return fmt.Errorf("deskripsi terlalu panjang (maksimal 72 karakter)!")
+					}
+					return nil
+				}),
+
+			// 4. Body Input
+			huh.NewInput().
+				Title("Deskripsi Detail (Body)").
+				Description("Penjelasan lebih mendalam tentang perubahan (opsional):").
+				Value(&answers.Body).
+				Placeholder("opsional"),
+
+			// 5. Konfirmasi Commit Langsung
+			huh.NewConfirm().
+				Title("Apakah Anda ingin membuat commit dengan pesan ini?").
+				Value(&answers.ConfirmCommit),
+		),
+	)
+
+	// Menjalankan form
+	err := form.Run()
+	if err != nil {
 		return nil, err
-	}
-
-	// Ambil bagian tipenya saja sebelum tanda titik dua (misal: "feat")
-	answers.Type = strings.TrimSpace(strings.Split(selectedType, ":")[0])
-
-	// 2. Scope (opsional, untuk memperjelas modul mana yang diubah)
-	scopePrompt := &survey.Input{
-		Message: "Masukkan scope commit (opsional, contoh: auth, database):",
-	}
-	if err := survey.AskOne(scopePrompt, &answers.Scope); err != nil {
-		return nil, err
-	}
-	answers.Scope = strings.TrimSpace(answers.Scope)
-
-	// 3. Subject (wajib, deskripsi singkat)
-	subjectPrompt := &survey.Input{
-		Message: "Tuliskan deskripsi singkat commit (wajib):",
-	}
-	if err := survey.AskOne(subjectPrompt, &answers.Subject, survey.WithValidator(survey.Required)); err != nil {
-		return nil, err
-	}
-	answers.Subject = strings.TrimSpace(answers.Subject)
-
-	// 4. Body (opsional, penjelasan mendalam)
-	bodyPrompt := &survey.Input{
-		Message: "Tuliskan deskripsi detail/body commit (opsional):",
-	}
-	if err := survey.AskOne(bodyPrompt, &answers.Body); err != nil {
-		return nil, err
-	}
-	answers.Body = strings.TrimSpace(answers.Body)
-
-	// 5. Konfirmasi apakah butuh footer (Breaking changes atau referensi isu/issue number)
-	confirmPrompt := &survey.Confirm{
-		Message: "Apakah ada breaking changes atau isu (GitHub) yang ingin ditutup?",
-		Default: false,
-	}
-	if err := survey.AskOne(confirmPrompt, &answers.HasFooter); err != nil {
-		return nil, err
-	}
-
-	// 6. Jika butuh footer, isi deskripsinya
-	if answers.HasFooter {
-		footerPrompt := &survey.Input{
-			Message: "Tuliskan isi footer (contoh: Closes #12, BREAKING CHANGE: ganti nama parameter x):",
-		}
-		if err := survey.AskOne(footerPrompt, &answers.Footer); err != nil {
-			return nil, err
-		}
-		answers.Footer = strings.TrimSpace(answers.Footer)
 	}
 
 	return &answers, nil
@@ -101,7 +93,7 @@ func AskQuestions() (*CommitAnswers, error) {
 func (a *CommitAnswers) FormatCommitMessage() string {
 	var msg strings.Builder
 
-	// Menulis header commit: type(scope): subject
+	// Header commit: type(scope): subject
 	msg.WriteString(a.Type)
 	if a.Scope != "" {
 		msg.WriteString("(" + a.Scope + ")")
@@ -109,16 +101,10 @@ func (a *CommitAnswers) FormatCommitMessage() string {
 	msg.WriteString(": ")
 	msg.WriteString(a.Subject)
 
-	// Menulis body jika ada
+	// Body jika diisi
 	if a.Body != "" {
 		msg.WriteString("\n\n")
 		msg.WriteString(a.Body)
-	}
-
-	// Menulis footer jika ada
-	if a.HasFooter && a.Footer != "" {
-		msg.WriteString("\n\n")
-		msg.WriteString(a.Footer)
 	}
 
 	return msg.String()
