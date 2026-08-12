@@ -99,6 +99,55 @@ func AskQuestions(defaultScope string, branchName string) (*CommitAnswers, error
 	return &answers, nil
 }
 
+// AskAICommitConfirmation menampilkan commit message hasil generate AI
+// dan minta konfirmasi dari user
+func AskAICommitConfirmation(commitMessage string) (bool, error) {
+	var confirm bool = true
+
+	form := huh.NewForm(
+		huh.NewGroup(
+			huh.NewNote().
+				Title("🤖 AI Generated Commit").
+				Description(commitMessage),
+
+			huh.NewConfirm().
+				Title("Gunakan commit message ini?").
+				Value(&confirm),
+		),
+	)
+
+	if err := form.Run(); err != nil {
+		return false, err
+	}
+
+	return confirm, nil
+}
+
+func AskPushConfirmation(branchName string) (bool, error) {
+	if branchName == "" {
+		return false, nil
+	}
+
+	var confirmPush bool
+
+	form := huh.NewForm(
+		huh.NewGroup(
+			huh.NewConfirm().
+				Title(fmt.Sprintf(
+					"Apakah Anda ingin langsung melakukan push ke remote repository dengan branch '%s'?",
+					branchName,
+				)).
+				Value(&confirmPush),
+		),
+	)
+
+	if err := form.Run(); err != nil {
+		return false, err
+	}
+
+	return confirmPush, nil
+}
+
 // FormatCommitMessage merangkai jawaban user menjadi satu string format Conventional Commits.
 func (a *CommitAnswers) FormatCommitMessage() string {
 	var msg strings.Builder
@@ -106,7 +155,10 @@ func (a *CommitAnswers) FormatCommitMessage() string {
 	// Header commit: type(scope): subject
 	msg.WriteString(a.Type)
 	if a.Scope != "" {
-		msg.WriteString("(" + a.Scope + ")")
+		msg.WriteString("(")
+		msg.WriteString(a.Scope)
+		msg.WriteString(")")
+
 	}
 	msg.WriteString(": ")
 	msg.WriteString(a.Subject)
