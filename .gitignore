@@ -1,3 +1,66 @@
+# ==============================
+# Go
+# ==============================
+
+# Compiled binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary
+*.test
+
+# Coverage
+*.out
+coverage.out
+coverage.html
+
+
+# ==============================
+# Environment / Secrets
+# ==============================
+
 .env
-testing
-git-smart.exe
+.env.*
+!.env.example
+
+
+# ==============================
+# IDE / Editor
+# ==============================
+
+.vscode/
+.idea/
+
+# VS Code local settings
+*.code-workspace
+
+
+# ==============================
+# OS
+# ==============================
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+# macOS
+.DS_Store
+
+
+# ==============================
+# Temporary files
+# ==============================
+
+*.log
+*.tmp
+*.temp
+
+
+# ==============================
+# Project-specific
+# ==============================
+
+testing/

@@ -20,9 +20,10 @@ type CommitAnswers struct {
 // AskQuestions memicu formulir interaktif satu halaman (TUI Form) menggunakan Huh.
 func AskQuestions(defaultScope string, branchName string) (*CommitAnswers, error) {
 	var answers CommitAnswers
-	answers.Scope = defaultScope // Mengisi scope secara otomatis berdasarkan tebakan git
-	answers.ConfirmCommit = true // Mengisi default value konfirmasi
-	answers.ConfirmPush = false  // Mengisi default value push
+
+	answers.Scope = defaultScope
+	answers.ConfirmCommit = true
+	answers.ConfirmPush = false
 
 	fields := []huh.Field{
 		// 1. Pemilihan Tipe Commit
@@ -50,7 +51,7 @@ func AskQuestions(defaultScope string, branchName string) (*CommitAnswers, error
 			Value(&answers.Scope).
 			Placeholder("opsional"),
 
-		// 3. Subject Input (Wajib dengan Validasi Panjang)
+		// 3. Subject Input
 		huh.NewInput().
 			Title("Deskripsi Singkat (Subject)").
 			Description("Ringkasan singkat apa yang diubah (wajib):").
@@ -58,12 +59,17 @@ func AskQuestions(defaultScope string, branchName string) (*CommitAnswers, error
 			Placeholder("Tulis deskripsi commit...").
 			Validate(func(str string) error {
 				trimmed := strings.TrimSpace(str)
+
 				if len(trimmed) == 0 {
 					return fmt.Errorf("deskripsi wajib diisi!")
 				}
+
 				if len(trimmed) > 72 {
-					return fmt.Errorf("deskripsi terlalu panjang (maksimal 72 karakter)!")
+					return fmt.Errorf(
+						"deskripsi terlalu panjang (maksimal 72 karakter)!",
+					)
 				}
+
 				return nil
 			}),
 
@@ -74,42 +80,45 @@ func AskQuestions(defaultScope string, branchName string) (*CommitAnswers, error
 			Value(&answers.Body).
 			Placeholder("opsional"),
 
-		// 5. Konfirmasi Commit Langsung
+		// 5. Konfirmasi Commit
 		huh.NewConfirm().
 			Title("Apakah Anda ingin membuat commit dengan pesan ini?").
 			Value(&answers.ConfirmCommit),
 	}
 
+	// 6. Konfirmasi Push
 	if branchName != "" {
-		fields = append(fields, huh.NewConfirm().
-			Title(fmt.Sprintf("Apakah Anda ingin langsung melakukan push ke remote repository dengan branch '%s'?", branchName)).
-			Value(&answers.ConfirmPush))
+		fields = append(
+			fields,
+			huh.NewConfirm().
+				Title(
+					fmt.Sprintf(
+						"Apakah Anda ingin langsung melakukan push ke remote repository dengan branch '%s'?",
+						branchName,
+					),
+				).
+				Value(&answers.ConfirmPush),
+		)
 	}
 
 	form := huh.NewForm(
 		huh.NewGroup(fields...),
 	)
 
-	// Menjalankan form
-	err := form.Run()
-	if err != nil {
+	if err := form.Run(); err != nil {
 		return nil, err
 	}
 
 	return &answers, nil
 }
 
-// AskAICommitConfirmation menampilkan commit message hasil generate AI
-// dan minta konfirmasi dari user
-func AskAICommitConfirmation(commitMessage string) (bool, error) {
-	var confirm bool = true
+// AskAICommitConfirmation meminta konfirmasi user terhadap commit message
+// yang sebelumnya sudah ditampilkan oleh caller.
+func AskAICommitConfirmation() (bool, error) {
+	var confirm = true
 
 	form := huh.NewForm(
 		huh.NewGroup(
-			huh.NewNote().
-				Title("🤖 AI Generated Commit").
-				Description(commitMessage),
-
 			huh.NewConfirm().
 				Title("Gunakan commit message ini?").
 				Value(&confirm),
@@ -123,6 +132,7 @@ func AskAICommitConfirmation(commitMessage string) (bool, error) {
 	return confirm, nil
 }
 
+// AskPushConfirmation meminta konfirmasi user untuk melakukan push.
 func AskPushConfirmation(branchName string) (bool, error) {
 	if branchName == "" {
 		return false, nil
@@ -133,10 +143,12 @@ func AskPushConfirmation(branchName string) (bool, error) {
 	form := huh.NewForm(
 		huh.NewGroup(
 			huh.NewConfirm().
-				Title(fmt.Sprintf(
-					"Apakah Anda ingin langsung melakukan push ke remote repository dengan branch '%s'?",
-					branchName,
-				)).
+				Title(
+					fmt.Sprintf(
+						"Apakah Anda ingin langsung melakukan push ke remote repository dengan branch '%s'?",
+						branchName,
+					),
+				).
 				Value(&confirmPush),
 		),
 	)
@@ -148,25 +160,27 @@ func AskPushConfirmation(branchName string) (bool, error) {
 	return confirmPush, nil
 }
 
-// FormatCommitMessage merangkai jawaban user menjadi satu string format Conventional Commits.
+// FormatCommitMessage merangkai jawaban user menjadi
+// satu string dengan format Conventional Commits.
 func (a *CommitAnswers) FormatCommitMessage() string {
 	var msg strings.Builder
 
-	// Header commit: type(scope): subject
+	// Header: type(scope): subject
 	msg.WriteString(a.Type)
+
 	if a.Scope != "" {
 		msg.WriteString("(")
 		msg.WriteString(a.Scope)
 		msg.WriteString(")")
-
 	}
+
 	msg.WriteString(": ")
 	msg.WriteString(a.Subject)
 
 	// Body jika diisi
-	if a.Body != "" {
+	if strings.TrimSpace(a.Body) != "" {
 		msg.WriteString("\n\n")
-		msg.WriteString(a.Body)
+		msg.WriteString(strings.TrimSpace(a.Body))
 	}
 
 	return msg.String()
